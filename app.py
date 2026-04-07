@@ -191,4 +191,4 @@ game_html = """
 # Render
 components.html(game_html, height=650)
 
-st.info("💡 Tip: AI sử dụng cảm biến tiệm cận để né tránh sự dối trá.")
+st.info("💡 Tip: Kiệt thì ấn có cho nhanh")
