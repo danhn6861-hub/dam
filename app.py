@@ -1,114 +1,194 @@
 import streamlit as st
-import time
-import random
+import streamlit.components.v1 as components
 
-# 1. Cấu hình trang & Giao diện Cyberpunk
-st.set_page_config(page_title="Hệ Thống Quét Nhân Phẩm Độc Lập", page_icon="🕵️‍♂️", layout="centered")
+# 1. Cấu hình trang
+st.set_page_config(page_title="Gay Test Ultimate 🌈", layout="centered")
 
+# 2. CSS nền
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: #00ff41; }
-    .stButton>button {
-        width: 100%; border-radius: 5px; border: 1px solid #00ff41;
-        background-color: #1a1c23; color: #00ff41;
-        font-family: 'Courier New', Courier, monospace;
+    .stApp {
+        background: linear-gradient(135deg, #1f1c2c 0%, #928dab 100%);
     }
-    .stButton>button:hover { background-color: #00ff41; color: #000; box-shadow: 0 0 15px #00ff41; }
-    .glitch {
-        font-size: 2rem; font-weight: bold; text-transform: uppercase;
-        text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.025em -0.05em 0 rgba(0,255,0,.75);
-        animation: glitch 500ms infinite;
-    }
-    @keyframes glitch {
-        0% { transform: translate(0); }
-        20% { transform: translate(-2px, 2px); }
-        40% { transform: translate(-2px, -2px); }
-        60% { transform: translate(2px, 2px); }
-        80% { transform: translate(2px, -2px); }
-        100% { transform: translate(0); }
-    }
+    #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Khởi tạo Session State
-if 'step' not in st.session_state: st.session_state.step = "identify"
-if 'user' not in st.session_state: st.session_state.user = None
-if 'q_step' not in st.session_state: st.session_state.q_step = 1
-
-st.markdown('<p class="glitch">CORE SYSTEM: INDIVIDUAL ANALYSIS</p>', unsafe_allow_html=True)
-
-# --- BƯỚC 1: XÁC ĐỊNH ĐỐI TƯỢNG ---
-if st.session_state.step == "identify":
-    st.write("### ⚠️ TRUY CẬP CÓ ĐIỀU KIỆN")
-    st.write("Hệ thống yêu cầu xác định đối tượng để tải cơ sở dữ liệu nhân phẩm riêng biệt.")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Truy cập hồ sơ KIỆT"):
-            st.session_state.user = "Kiệt"
-            st.session_state.step = "questions"
-            st.rerun()
-    with col2:
-        if st.button("Truy cập hồ sơ CHÍNH"):
-            st.session_state.user = "Chính"
-            st.session_state.step = "questions"
-            st.rerun()
-
-# --- BƯỚC 2: CÂU HỎI TRẮC NGHIỆM TÂM LÝ ---
-elif st.session_state.step == "questions":
-    st.write(f"### 🛡️ Câu hỏi xác minh cho: {st.session_state.user}")
+# 3. HTML/JS/CSS hỗn hợp
+game_html = """
+<div id="wrapper">
+    <div class="header-zone">
+        <h2 class="title">AI GENDER SCANNER</h2>
+        <p class="subtitle">Premium v2.0.1 - Mobile Optimized</p>
+    </div>
     
-    if st.session_state.q_step == 1:
-        st.write("**Câu 1: Bạn thường làm gì khi thấy một chàng trai đẹp mã đi ngang qua?**")
-        if st.button("A. Nhìn thẳng vào mắt để khiêu khích"): st.session_state.q_step = 2; st.rerun()
-        if st.button("B. Lén lút nhìn từ dưới lên trên"): st.session_state.q_step = 2; st.rerun()
-        if st.button("C. Giả vờ bấm điện thoại nhưng bật camera trước"): st.session_state.q_step = 2; st.rerun()
+    <div class="question-zone">
+        <h1>Bạn có phải là GAY không? 🌈</h1>
+    </div>
 
-    elif st.session_state.q_step == 2:
-        st.write("**Câu 2: Nếu được chọn một món quà từ 'người bạn thân nhất', bạn thích gì?**")
-        if st.button("A. Một nụ hôn bất ngờ lên má"): st.session_state.step = "scan"; st.rerun()
-        if st.button("B. Một cuốn cẩm nang 'Cách thoát kiếp thẳng'"): st.session_state.step = "scan"; st.rerun()
-        if st.button("C. Một đêm mất ngủ cùng nhau"): st.session_state.step = "scan"; st.rerun()
+    <div id="game-container">
+        <button id="yes-btn">CÓ 👍</button>
+        <button id="no-btn">KHÔNG ❌</button>
+    </div>
+</div>
 
-# --- BƯỚC 3: QUÉT DỮ LIỆU ---
-elif st.session_state.step == "scan":
-    st.write(f"### 🔍 Đang trích xuất dữ liệu bí mật của {st.session_state.user}...")
-    bar = st.progress(0)
-    for i in range(100):
-        time.sleep(0.03)
-        bar.progress(i + 1)
-    st.session_state.step = "result"
-    st.rerun()
-
-# --- BƯỚC 4: KẾT QUẢ RIÊNG BIỆT ---
-elif st.session_state.step == "result":
-    st.success(f"✅ BÁO CÁO PHÂN TÍCH CHO ĐỐI TƯỢNG: {st.session_state.user.upper()}")
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap');
     
-    if st.session_state.user == "Kiệt":
-        st.error("## ĐỘ GAY: 99%")
-        st.code(f"""
-        [PHÂN TÍCH CHI TIẾT - KIỆT]
-        - Trạng thái: Đã 'cong' hoàn toàn, không thể uốn thẳng.
-        - Triệu chứng: Hay nhìn trai với ánh mắt đắm đuối.
-        - Đặc điểm: Thích xem SEX nhưng tâm hồn hướng về 'cột điện'.
-        - Lời khuyên: Đừng gồng nữa Kiệt ơi, Chính biết hết rồi.
-        """, language="bash")
-        st.warning("⚠️ Cảnh báo: Hệ thống phát hiện Kiệt đang có ý định 'tấn công' Chính vào tối nay.")
+    #wrapper {
+        font-family: 'Inter', sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: white;
+        padding: 20px;
+        text-align: center;
+    }
 
-    elif st.session_state.user == "Chính":
-        st.error("## ĐỘ GAY: 80%")
-        st.code(f"""
-        [PHÂN TÍCH CHI TIẾT - CHÍNH]
-        - Trạng thái: Gay tiềm ẩn (Bán lộ).
-        - Triệu chứng: Thích được Kiệt quan tâm nhưng hay giả vờ ngại ngùng.
-        - Đặc điểm: Thích 'núi đôi' nhưng thực tế lại hay đi chơi riêng với Kiệt.
-        - Lời khuyên: 80% là con số khá cao, Chính nên chuẩn bị tâm lý làm 'cô dâu'.
-        """, language="bash")
-        st.warning("⚠️ Cảnh báo: Chính đang lọt vào tầm ngắm của đối tượng Kiệt (99% Gay).")
+    .title {
+        font-size: clamp(24px, 5vw, 32px);
+        font-weight: 800;
+        background: linear-gradient(to right, #ff00cc, #3333ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+    }
 
-    if st.button("ĐĂNG XUẤT (XÓA DẤU VẾT)"):
-        st.session_state.step = "identify"
-        st.session_state.q_step = 1
-        st.session_state.user = None
-        st.rerun()
+    .subtitle {
+        color: #aaa;
+        font-size: 14px;
+        margin-bottom: 30px;
+    }
 
-st.caption("Ghi chú: Kết quả dựa trên thuật toán AI dự đoán nhân phẩm. Không dành cho người nghiêm túc.")
+    .question-zone h1 {
+        font-size: clamp(28px, 8vw, 42px);
+        margin-bottom: 40px;
+    }
+
+    #game-container {
+        position: relative;
+        width: 100%;
+        max-width: 600px;
+        height: 350px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 25px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        touch-action: none; /* Ngăn chặn scroll khi chạm trên điện thoại */
+    }
+
+    #yes-btn {
+        padding: 15px 45px;
+        font-size: 20px;
+        font-weight: bold;
+        color: white;
+        background: linear-gradient(45deg, #4CAF50, #8BC34A);
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        z-index: 10;
+        box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+    }
+
+    #no-btn {
+        position: absolute;
+        padding: 12px 30px;
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+        background: linear-gradient(45deg, #ff4b4b, #ff7676);
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        z-index: 20;
+        transition: all 0.15s ease-out;
+        white-space: nowrap;
+    }
+
+    /* Tối ưu cho điện thoại */
+    @media (max-width: 480px) {
+        #game-container {
+            height: 400px;
+        }
+        #yes-btn {
+            padding: 12px 35px;
+            font-size: 18px;
+        }
+        #no-btn {
+            padding: 10px 25px;
+            font-size: 16px;
+        }
+    }
+</style>
+
+<script>
+    const noBtn = document.getElementById('no-btn');
+    const yesBtn = document.getElementById('yes-btn');
+    const container = document.getElementById('game-container');
+
+    // Khởi tạo vị trí ban đầu cho nút KHÔNG (nằm dưới nút CÓ một chút trên mobile hoặc bên cạnh trên PC)
+    noBtn.style.left = '50%';
+    noBtn.style.top = '75%';
+    noBtn.style.transform = 'translateX(-50%)';
+
+    const moveNoBtn = (e) => {
+        const containerRect = container.getBoundingClientRect();
+        const yesRect = yesBtn.getBoundingClientRect();
+        const btnWidth = noBtn.offsetWidth;
+        const btnHeight = noBtn.offsetHeight;
+
+        let newX, newY;
+        let isOverlapping = true;
+
+        // Vòng lặp tìm vị trí mới cho đến khi không đè lên nút CÓ
+        while (isOverlapping) {
+            newX = Math.random() * (containerRect.width - btnWidth - 20) + 10;
+            newY = Math.random() * (containerRect.height - btnHeight - 20) + 10;
+
+            // Kiểm tra va chạm với nút CÓ (Yes)
+            // Lấy tọa độ tương đối của nút Có trong container
+            const yesLeft = yesRect.left - containerRect.left;
+            const yesTop = yesRect.top - containerRect.top;
+            
+            // Tạo một vùng an toàn quanh nút CÓ (padding 50px)
+            const safetyMargin = 60;
+            
+            const overlapX = newX + btnWidth > yesLeft - safetyMargin && newX < yesLeft + yesRect.width + safetyMargin;
+            const overlapY = newY + btnHeight > yesTop - safetyMargin && newY < yesTop + yesRect.height + safetyMargin;
+
+            if (!overlapX || !overlapY) {
+                isOverlapping = false;
+            }
+        }
+
+        noBtn.style.left = newX + 'px';
+        noBtn.style.top = newY + 'px';
+        noBtn.style.transform = 'none';
+    };
+
+    // Sự kiện cho cả PC và Mobile
+    noBtn.addEventListener('mouseover', moveNoBtn);
+    noBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Ngăn chặn click giả lập
+        moveNoBtn();
+    });
+    
+    noBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('Hệ thống phát hiện nỗ lực gian lận! Vui lòng chọn lại.');
+    });
+
+    yesBtn.addEventListener('click', () => {
+        alert('🎉 Chúc mừng! Bạn đã vượt qua bài kiểm tra độ trung thực của AI.');
+        window.parent.location.reload(); 
+    });
+</script>
+"""
+
+# Render
+components.html(game_html, height=650)
+
+st.info("💡 Tip: AI sử dụng cảm biến tiệm cận để né tránh sự dối trá.")
