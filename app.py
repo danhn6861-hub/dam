@@ -2,13 +2,13 @@ import streamlit as st
 import pandas as pd
 import collections
 import numpy as np
+from scipy.stats import norm
 
 # Cấu hình trang - GIỮ NGUYÊN 100%
 st.set_page_config(page_title="Bot TX Pro Max", layout="wide")
 st.title("🤖 Bot Phân Tích Xác Suất & Biến Cố Pro")
 
 # --- KHỞI TẠO DỮ LIỆU ---
-# Sử dụng collections.deque để giới hạn bộ nhớ, tránh tràn RAM/Leak khi chạy 24/7
 MAX_DATA = 2000
 
 if 'history' not in st.session_state:
@@ -17,63 +17,77 @@ if 'bot_preds' not in st.session_state:
     st.session_state.bot_preds = []
 if 'outcomes' not in st.session_state:
     st.session_state.outcomes = []
-# Khởi tạo tham số Bayesian (Alpha/Beta) để theo dõi phân phối xác suất dài hạn
 if 'alpha' not in st.session_state:
     st.session_state.alpha = 1.0
 if 'beta' not in st.session_state:
     st.session_state.beta = 1.0
 
-# --- THUẬT TOÁN DỰ ĐOÁN (NÂNG CẤP PRO MAX: MARKOV BẬC CAO + LAPLACE SMOOTHING) ---
+# --- CÔNG CỤ KIỂM ĐỊNH TÍNH NGẪU NHIÊN (RUNS TEST) ---
+def runs_test(seq):
+    n = len(seq)
+    if n < 10:
+        return 0.5
+    runs = 1
+    for i in range(1, n):
+        if seq[i] != seq[i-1]:
+            runs += 1
+    p_t = seq.count('T') / n
+    p_x = 1 - p_t
+    expected = 2 * n * p_t * p_x + 1
+    variance = (expected - 1) * (expected - 2) / (n - 1) if n > 1 else 1
+    if variance <= 0:
+        return 0.5
+    z = (runs - expected) / (variance ** 0.5)
+    p_value = 2 * (1 - norm.cdf(abs(z)))
+    return p_value
+
+# --- THUẬT TOÁN DỰ ĐOÁN ---
 def advanced_predict():
     hist = st.session_state.history
-    if len(hist) < 10:  # Cần đủ mẫu ban đầu để Bayesian và Markov hoạt động
+    if len(hist) < 10:
         return "T"
     
-    # 1. Thuật toán Markov bậc cao (k=3) với Laplace Smoothing (+1) để tránh xác suất 0
-    k = 3
-    recent_hist = hist[-150:] # Cửa sổ trượt 150 ván để bắt kịp trend
-    pattern = tuple(recent_hist[-k:])
+    recent_test = hist[-100:]
+    p_random = runs_test(recent_test)
     
-    # Đếm tần suất xuất hiện các mẫu hình k ván
-    counts = collections.defaultdict(lambda: {'T': 1, 'X': 1}) # Laplace Smoothing khởi tạo 1
+    if p_random > 0.05:
+        prob_t_bayesian = st.session_state.alpha / (st.session_state.alpha + st.session_state.beta)
+        return "T" if prob_t_bayesian > 0.5 else "X"
+
+    k = 3
+    recent_hist = hist[-150:]
+    pattern = tuple(recent_hist[-k:])
+    counts = collections.defaultdict(lambda: {'T': 1, 'X': 1})
     for i in range(len(recent_hist) - k):
         p = tuple(recent_hist[i:i+k])
         nxt = recent_hist[i+k]
         counts[p][nxt] += 1
-            
-    # Tính xác suất có điều kiện cho mẫu hiện tại
     prob_t_markov = counts[pattern]['T'] / (counts[pattern]['T'] + counts[pattern]['X'])
 
-    # 2. Thành phần Bayesian: Dự đoán dựa trên kỳ vọng hậu nghiệm dài hạn
     prob_t_bayesian = st.session_state.alpha / (st.session_state.alpha + st.session_state.beta)
 
-    # 3. Kết hợp trọng số (Ensemble): Ưu tiên Markov cho ngắn hạn, Bayesian cho dài hạn
-    # Trọng số Markov tăng dần theo độ dài lịch sử
     weight_markov = min(0.7, len(hist) / 200)
-    final_prob_t = (weight_markov * prob_t_markov) + ((1 - weight_markov) * prob_t_bayesian)
+    final_prob = (weight_markov * prob_t_markov) + ((1 - weight_markov) * prob_t_bayesian)
 
-    # Ngưỡng quyết định cực kỳ nhạy
-    if final_prob_t > 0.51: return "T"
-    if final_prob_t < 0.49: return "X"
+    epsilon = max(0.01, 0.05 - len(hist)/2000)
+    if final_prob > 0.5 + epsilon:
+        return "T"
+    if final_prob < 0.5 - epsilon:
+        return "X"
     
-    # Nếu hòa vốn (50/50), đánh theo xu hướng ván cuối cùng (Trend Following)
-    return hist[-1]
+    trend = hist[-10:]
+    return max(set(trend), key=trend.count)
 
-# --- XỬ LÝ DỮ LIỆU KHI CLICK (TỐI ƯU CLICK ĂN NGAY) ---
+# --- XỬ LÝ DỮ LIỆU ---
 def add_record(res):
-    # Lấy dự đoán hiện tại trước khi cập nhật
     current_pred = st.session_state.next_suggestion
-    
-    # Kiểm tra thắng thua
     status = "✅ THẮNG" if res == current_pred else "❌ THUA"
     
-    # Cập nhật tham số Bayesian ngay khi có kết quả thực tế
     if res == 'T':
         st.session_state.alpha += 1
     else:
         st.session_state.beta += 1
     
-    # Lưu vào lịch sử và kiểm soát RAM
     st.session_state.history.append(res)
     st.session_state.bot_preds.append(current_pred)
     st.session_state.outcomes.append(status)
@@ -83,8 +97,7 @@ def add_record(res):
         st.session_state.bot_preds.pop(0)
         st.session_state.outcomes.pop(0)
 
-# --- GIAO DIỆN CHÍNH - GIỮ NGUYÊN 100% ---
-# Tính toán dự đoán cho ván tiếp theo
+# --- GIAO DIỆN CHÍNH ---
 st.session_state.next_suggestion = advanced_predict()
 
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -94,7 +107,6 @@ with col2:
     st.write("---")
     st.write("### Nhập kết quả thực tế (Click là ăn ngay):")
     
-    # Nút bấm trực tiếp - GIỮ NGUYÊN 100%
     btn_t, btn_x = st.columns(2)
     with btn_t:
         if st.button("🔴 TÀI (T)", key="btn_t", use_container_width=True):
@@ -105,7 +117,7 @@ with col2:
             add_record("X")
             st.rerun()
 
-# --- THỐNG KÊ BIẾN CỐ - GIỮ NGUYÊN 100% ---
+# --- THỐNG KÊ ---
 if st.session_state.history:
     total_games = len(st.session_state.history)
     wins = st.session_state.outcomes.count("✅ THẮNG")
@@ -115,7 +127,6 @@ if st.session_state.history:
     st.sidebar.metric("Tỷ lệ thắng Bot", f"{round(win_rate, 1)}%")
     st.sidebar.write(f"Tổng ván (Lưu trữ): {total_games}")
     
-    # Biểu đồ tần suất
     st.sidebar.write("---")
     t_count = st.session_state.history.count("T")
     t_rate = t_count / total_games
@@ -124,7 +135,7 @@ if st.session_state.history:
     st.sidebar.write(f"Xỉu (X): {round((1-t_rate)*100)}%")
     st.sidebar.progress(1-t_rate)
 
-# --- HIỂN THỊ LỊCH SỬ DỰ ĐOÁN - GIỮ NGUYÊN 100% ---
+# --- HIỂN THỊ LỊCH SỬ (ĐÃ SỬA LỖI MAP) ---
 st.divider()
 st.subheader("📝 Lịch sử dự đoán và Biến cố")
 
@@ -141,7 +152,8 @@ if st.session_state.history:
         color = '#2ecc71' if 'THẮNG' in val else '#e74c3c'
         return f'color: {color}; font-weight: bold'
 
-    st.table(df.iloc[::-1].style.applymap(color_status, subset=['Trạng Thái']))
+    # Sửa từ applymap sang map để tương thích Pandas 2.x
+    st.table(df.iloc[::-1].style.map(color_status, subset=['Trạng Thái']))
 
 if st.button("🔄 Reset toàn bộ"):
     st.session_state.clear()
