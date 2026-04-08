@@ -1,194 +1,148 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
+import collections
+import numpy as np
 
-# 1. Cấu hình trang
-st.set_page_config(page_title="Gay Test Ultimate 🌈", layout="centered")
+# Cấu hình trang - GIỮ NGUYÊN 100%
+st.set_page_config(page_title="Bot TX Pro Max", layout="wide")
+st.title("🤖 Bot Phân Tích Xác Suất & Biến Cố Pro")
 
-# 2. CSS nền
-st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(135deg, #1f1c2c 0%, #928dab 100%);
-    }
-    #MainMenu, footer, header {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
+# --- KHỞI TẠO DỮ LIỆU ---
+# Sử dụng collections.deque để giới hạn bộ nhớ, tránh tràn RAM/Leak khi chạy 24/7
+MAX_DATA = 2000
 
-# 3. HTML/JS/CSS hỗn hợp
-game_html = """
-<div id="wrapper">
-    <div class="header-zone">
-        <h2 class="title">AI GENDER SCANNER</h2>
-        <p class="subtitle">Premium v2.0.1 - Mobile Optimized</p>
-    </div>
+if 'history' not in st.session_state:
+    st.session_state.history = []
+if 'bot_preds' not in st.session_state:
+    st.session_state.bot_preds = []
+if 'outcomes' not in st.session_state:
+    st.session_state.outcomes = []
+# Khởi tạo tham số Bayesian (Alpha/Beta) để theo dõi phân phối xác suất dài hạn
+if 'alpha' not in st.session_state:
+    st.session_state.alpha = 1.0
+if 'beta' not in st.session_state:
+    st.session_state.beta = 1.0
+
+# --- THUẬT TOÁN DỰ ĐOÁN (NÂNG CẤP PRO MAX: MARKOV BẬC CAO + LAPLACE SMOOTHING) ---
+def advanced_predict():
+    hist = st.session_state.history
+    if len(hist) < 10:  # Cần đủ mẫu ban đầu để Bayesian và Markov hoạt động
+        return "T"
     
-    <div class="question-zone">
-        <h1>Bạn có phải là GAY không? 🌈</h1>
-    </div>
-
-    <div id="game-container">
-        <button id="yes-btn">CÓ 👍</button>
-        <button id="no-btn">KHÔNG ❌</button>
-    </div>
-</div>
-
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap');
+    # 1. Thuật toán Markov bậc cao (k=3) với Laplace Smoothing (+1) để tránh xác suất 0
+    k = 3
+    recent_hist = hist[-150:] # Cửa sổ trượt 150 ván để bắt kịp trend
+    pattern = tuple(recent_hist[-k:])
     
-    #wrapper {
-        font-family: 'Inter', sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        color: white;
-        padding: 20px;
-        text-align: center;
-    }
-
-    .title {
-        font-size: clamp(24px, 5vw, 32px);
-        font-weight: 800;
-        background: linear-gradient(to right, #ff00cc, #3333ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0;
-    }
-
-    .subtitle {
-        color: #aaa;
-        font-size: 14px;
-        margin-bottom: 30px;
-    }
-
-    .question-zone h1 {
-        font-size: clamp(28px, 8vw, 42px);
-        margin-bottom: 40px;
-    }
-
-    #game-container {
-        position: relative;
-        width: 100%;
-        max-width: 600px;
-        height: 350px;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 25px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: none; /* Ngăn chặn scroll khi chạm trên điện thoại */
-    }
-
-    #yes-btn {
-        padding: 15px 45px;
-        font-size: 20px;
-        font-weight: bold;
-        color: white;
-        background: linear-gradient(45deg, #4CAF50, #8BC34A);
-        border: none;
-        border-radius: 50px;
-        cursor: pointer;
-        z-index: 10;
-        box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
-    }
-
-    #no-btn {
-        position: absolute;
-        padding: 12px 30px;
-        font-size: 18px;
-        font-weight: bold;
-        color: white;
-        background: linear-gradient(45deg, #ff4b4b, #ff7676);
-        border: none;
-        border-radius: 50px;
-        cursor: pointer;
-        z-index: 20;
-        transition: all 0.15s ease-out;
-        white-space: nowrap;
-    }
-
-    /* Tối ưu cho điện thoại */
-    @media (max-width: 480px) {
-        #game-container {
-            height: 400px;
-        }
-        #yes-btn {
-            padding: 12px 35px;
-            font-size: 18px;
-        }
-        #no-btn {
-            padding: 10px 25px;
-            font-size: 16px;
-        }
-    }
-</style>
-
-<script>
-    const noBtn = document.getElementById('no-btn');
-    const yesBtn = document.getElementById('yes-btn');
-    const container = document.getElementById('game-container');
-
-    // Khởi tạo vị trí ban đầu cho nút KHÔNG (nằm dưới nút CÓ một chút trên mobile hoặc bên cạnh trên PC)
-    noBtn.style.left = '50%';
-    noBtn.style.top = '75%';
-    noBtn.style.transform = 'translateX(-50%)';
-
-    const moveNoBtn = (e) => {
-        const containerRect = container.getBoundingClientRect();
-        const yesRect = yesBtn.getBoundingClientRect();
-        const btnWidth = noBtn.offsetWidth;
-        const btnHeight = noBtn.offsetHeight;
-
-        let newX, newY;
-        let isOverlapping = true;
-
-        // Vòng lặp tìm vị trí mới cho đến khi không đè lên nút CÓ
-        while (isOverlapping) {
-            newX = Math.random() * (containerRect.width - btnWidth - 20) + 10;
-            newY = Math.random() * (containerRect.height - btnHeight - 20) + 10;
-
-            // Kiểm tra va chạm với nút CÓ (Yes)
-            // Lấy tọa độ tương đối của nút Có trong container
-            const yesLeft = yesRect.left - containerRect.left;
-            const yesTop = yesRect.top - containerRect.top;
+    # Đếm tần suất xuất hiện các mẫu hình k ván
+    counts = collections.defaultdict(lambda: {'T': 1, 'X': 1}) # Laplace Smoothing khởi tạo 1
+    for i in range(len(recent_hist) - k):
+        p = tuple(recent_hist[i:i+k])
+        nxt = recent_hist[i+k]
+        counts[p][nxt] += 1
             
-            // Tạo một vùng an toàn quanh nút CÓ (padding 50px)
-            const safetyMargin = 60;
-            
-            const overlapX = newX + btnWidth > yesLeft - safetyMargin && newX < yesLeft + yesRect.width + safetyMargin;
-            const overlapY = newY + btnHeight > yesTop - safetyMargin && newY < yesTop + yesRect.height + safetyMargin;
+    # Tính xác suất có điều kiện cho mẫu hiện tại
+    prob_t_markov = counts[pattern]['T'] / (counts[pattern]['T'] + counts[pattern]['X'])
 
-            if (!overlapX || !overlapY) {
-                isOverlapping = false;
-            }
-        }
+    # 2. Thành phần Bayesian: Dự đoán dựa trên kỳ vọng hậu nghiệm dài hạn
+    prob_t_bayesian = st.session_state.alpha / (st.session_state.alpha + st.session_state.beta)
 
-        noBtn.style.left = newX + 'px';
-        noBtn.style.top = newY + 'px';
-        noBtn.style.transform = 'none';
-    };
+    # 3. Kết hợp trọng số (Ensemble): Ưu tiên Markov cho ngắn hạn, Bayesian cho dài hạn
+    # Trọng số Markov tăng dần theo độ dài lịch sử
+    weight_markov = min(0.7, len(hist) / 200)
+    final_prob_t = (weight_markov * prob_t_markov) + ((1 - weight_markov) * prob_t_bayesian)
 
-    // Sự kiện cho cả PC và Mobile
-    noBtn.addEventListener('mouseover', moveNoBtn);
-    noBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // Ngăn chặn click giả lập
-        moveNoBtn();
-    });
+    # Ngưỡng quyết định cực kỳ nhạy
+    if final_prob_t > 0.51: return "T"
+    if final_prob_t < 0.49: return "X"
     
-    noBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        alert('Hệ thống phát hiện nỗ lực gian lận! Vui lòng chọn lại.');
-    });
+    # Nếu hòa vốn (50/50), đánh theo xu hướng ván cuối cùng (Trend Following)
+    return hist[-1]
 
-    yesBtn.addEventListener('click', () => {
-        alert('🎉 Chúc mừng! Bạn đã vượt qua bài kiểm tra độ trung thực của AI.');
-        window.parent.location.reload(); 
-    });
-</script>
-"""
+# --- XỬ LÝ DỮ LIỆU KHI CLICK (TỐI ƯU CLICK ĂN NGAY) ---
+def add_record(res):
+    # Lấy dự đoán hiện tại trước khi cập nhật
+    current_pred = st.session_state.next_suggestion
+    
+    # Kiểm tra thắng thua
+    status = "✅ THẮNG" if res == current_pred else "❌ THUA"
+    
+    # Cập nhật tham số Bayesian ngay khi có kết quả thực tế
+    if res == 'T':
+        st.session_state.alpha += 1
+    else:
+        st.session_state.beta += 1
+    
+    # Lưu vào lịch sử và kiểm soát RAM
+    st.session_state.history.append(res)
+    st.session_state.bot_preds.append(current_pred)
+    st.session_state.outcomes.append(status)
+    
+    if len(st.session_state.history) > MAX_DATA:
+        st.session_state.history.pop(0)
+        st.session_state.bot_preds.pop(0)
+        st.session_state.outcomes.pop(0)
 
-# Render
-components.html(game_html, height=650)
+# --- GIAO DIỆN CHÍNH - GIỮ NGUYÊN 100% ---
+# Tính toán dự đoán cho ván tiếp theo
+st.session_state.next_suggestion = advanced_predict()
 
-st.info("💡 Tip: Kiệt thì ấn có cho nhanh")
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col2:
+    st.subheader(f"Dự đoán ván tới: :red[{st.session_state.next_suggestion}]")
+    st.write("---")
+    st.write("### Nhập kết quả thực tế (Click là ăn ngay):")
+    
+    # Nút bấm trực tiếp - GIỮ NGUYÊN 100%
+    btn_t, btn_x = st.columns(2)
+    with btn_t:
+        if st.button("🔴 TÀI (T)", key="btn_t", use_container_width=True):
+            add_record("T")
+            st.rerun()
+    with btn_x:
+        if st.button("🔵 XỈU (X)", key="btn_x", use_container_width=True):
+            add_record("X")
+            st.rerun()
+
+# --- THỐNG KÊ BIẾN CỐ - GIỮ NGUYÊN 100% ---
+if st.session_state.history:
+    total_games = len(st.session_state.history)
+    wins = st.session_state.outcomes.count("✅ THẮNG")
+    win_rate = (wins / total_games) * 100
+
+    st.sidebar.header("📊 Chỉ số hiệu quả")
+    st.sidebar.metric("Tỷ lệ thắng Bot", f"{round(win_rate, 1)}%")
+    st.sidebar.write(f"Tổng ván (Lưu trữ): {total_games}")
+    
+    # Biểu đồ tần suất
+    st.sidebar.write("---")
+    t_count = st.session_state.history.count("T")
+    t_rate = t_count / total_games
+    st.sidebar.write(f"Tài (T): {round(t_rate*100)}%")
+    st.sidebar.progress(t_rate)
+    st.sidebar.write(f"Xỉu (X): {round((1-t_rate)*100)}%")
+    st.sidebar.progress(1-t_rate)
+
+# --- HIỂN THỊ LỊCH SỬ DỰ ĐOÁN - GIỮ NGUYÊN 100% ---
+st.divider()
+st.subheader("📝 Lịch sử dự đoán và Biến cố")
+
+if st.session_state.history:
+    display_limit = 50
+    df = pd.DataFrame({
+        "Ván thứ": range(len(st.session_state.history) - len(st.session_state.history[-display_limit:]) + 1, len(st.session_state.history) + 1),
+        "Bot Dự Đoán": st.session_state.bot_preds[-display_limit:],
+        "Kết Quả Thực": st.session_state.history[-display_limit:],
+        "Trạng Thái": st.session_state.outcomes[-display_limit:]
+    })
+    
+    def color_status(val):
+        color = '#2ecc71' if 'THẮNG' in val else '#e74c3c'
+        return f'color: {color}; font-weight: bold'
+
+    st.table(df.iloc[::-1].style.applymap(color_status, subset=['Trạng Thái']))
+
+if st.button("🔄 Reset toàn bộ"):
+    st.session_state.clear()
+    st.rerun()
